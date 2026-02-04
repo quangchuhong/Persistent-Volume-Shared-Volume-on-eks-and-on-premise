@@ -234,5 +234,33 @@ spec:
 app-a và app-b cùng đọc/ghi /shared trên EFS.
 
 ---
+### 3. Shared Volume trên các server Docker on‑premise
+**3.1. Trường hợp 1 – Share volume trên CÙNG 1 server Docker**
+Dùng bind mount hoặc docker volume local.
 
+Bind mount:
+```bash
+mkdir -p /data/shared
 
+docker run -d --name app1 \
+  -v /data/shared:/shared \
+  your-image-a
+
+docker run -d --name app2 \
+  -v /data/shared:/shared \
+  your-image-b
+
+```
+Docker volume local:
+
+```bash
+docker volume create myshared
+
+docker run -d --name app1 -v myshared:/shared your-image-a
+docker run -d --name app2 -v myshared:/shared your-image-b
+
+```
+
+Giới hạn:
+
+Chỉ share được giữa các container trên cùng host.
