@@ -131,3 +131,108 @@ Dùng khi:
   - Ví dụ: thư mục upload chung, log chung, share config, build cache…
     
 EBS không share giữa nhiều node. Cần dùng EFS (Network FS).
+
+### 2.2. Cài AWS EFS CSI Driver
+```bash
+helm repo add aws-efs-csi-driver https://kubernetes-sigs.github.io/aws-efs-csi-driver
+helm repo update
+
+helm upgrade --install aws-efs-csi-driver aws-efs-csi-driver/aws-efs-csi-driver \
+  -n kube-system
+
+```
+Tạo EFS filesystem trước (trên AWS console/CLI), lấy fileSystemId.
+
+### 2.3. StorageClass dùng EFS
+```bash
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: efs-sc
+provisioner: efs.csi.aws.com
+parameters:
+  fileSystemId: fs-xxxxxxxx      # ID EFS
+  directoryPerms: "700"
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+
+```
+```bash
+kubectl apply -f storageclass-efs-sc.yaml
+```
+### 2.4. PVC RWMany (share cho nhiều pod)
+```bash
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-data-pvc
+  namespace: shared-apps
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-sc
+  resources:
+    requests:
+      storage: 5Gi    # EFS là elastic, con số này chỉ là logic
+
+```
+### 2.5. Dùng chung PVC trong nhiều Deployment
+```bash
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-a
+  namespace: shared-apps
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app-a
+  template:
+    metadata:
+      labels:
+        app: app-a
+    spec:
+      containers:
+        - name: app-a
+          image: your-image-a
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+      volumes:
+        - name: shared
+          persistentVolumeClaim:
+            claimName: shared-data-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-b
+  namespace: shared-apps
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app-b
+  template:
+    metadata:
+      labels:
+        app: app-b
+    spec:
+      containers:
+        - name: app-b
+          image: your-image-b
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+      volumes:
+        - name: shared
+          persistentVolumeClaim:
+            claimName: shared-data-pvc
+
+```
+app-a và app-b cùng đọc/ghi /shared trên EFS.
+
+---
+
+
