@@ -65,6 +65,65 @@ Apply:
 kubectl apply -f storageclass-gp3-ebs.yaml
 
 ```
+**Lưu ý:**
+
+**volumeBindingMode** là thuộc tính của StorageClass, quyết định khi nào và ở đâu Kubernetes sẽ tạo & bind PersistentVolume (PV) cho PVC.
+
+Có 2 giá trị chính:
+
+**1. volumeBindingMode: Immediate (mặc định)**
+  - PV được tạo & bind ngay khi PVC được tạo, trước khi pod được schedule.
+
+  - Scheduler chưa biết pod sẽ chạy ở node/AZ nào → với storage có ràng buộc AZ (EBS) dễ bị:
+
+    - PV tạo ở AZ A,
+    - Pod được schedule vào node ở AZ B → không attach được volume → pod Pending / phải reschedule.
+
+ví dụ:
+```bash
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3-ebs-immediate
+provisioner: ebs.csi.aws.com
+volumeBindingMode: Immediate
+parameters:
+  type: gp3
+  fsType: ext4
+
+```
+Dùng ổn với:
+
+  - Storage không phụ thuộc topology (NFS, EFS, v.v.)
+  - Môi trường đơn giản, 1 AZ.
+    
+**2. volumeBindingMode: WaitForFirstConsumer (nên dùng cho EBS)**
+
+  - PV chỉ được tạo & bind khi có pod đầu tiên dùng PVC đó được schedule.
+
+  - Scheduler sẽ:
+    - Chọn node (và AZ) phù hợp cho pod,
+    - Sau đó provisioner tạo EBS volume trong AZ của node đó → tránh mismatch AZ.
+      
+Ví dụ (EKS/EBS khuyên dùng):
+```bash
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3-ebs
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  type: gp3
+  fsType: ext4
+reclaimPolicy: Delete
+
+```
+Lợi ích:
+
+  - Đảm bảo PV (EBS) nằm đúng AZ với node chạy pod.
+  - Tránh lỗi pod Pending do “volume node affinity conflict”.
+
 ### 1.4. PVC (PersistentVolumeClaim) dùng EBS
 Ví dụ PVC 20Gi cho 1 app:
 ```bash
