@@ -264,3 +264,77 @@ docker run -d --name app2 -v myshared:/shared your-image-b
 Giới hạn:
 
 Chỉ share được giữa các container trên cùng host.
+
+---
+**3.2. Trường hợp 2 – Share volume giữa NHIỀU server Docker (multi‑host)**
+
+Cần 1 filesystem mạng (NFS, GlusterFS, CephFS…). Phổ biến và dễ nhất là NFS.
+
+Giả sử:
+
+  - NFS server: nfs01, export /data/shared
+  - Docker hosts: docker01, docker02
+    
+**3.2.1. NFS server**
+/etc/exports:
+```bash
+/data/shared 10.0.0.0/24(rw,sync,no_root_squash)
+
+```
+```bash
+mkdir -p /data/shared
+exportfs -ra
+
+```
+
+**3.2.2. Trên mỗi Docker host**
+```bash
+mkdir -p /mnt/shared
+mount -t nfs nfs01:/data/shared /mnt/shared
+
+# Nếu muốn mount tự động:
+echo "nfs01:/data/shared /mnt/shared nfs defaults 0 0" >> /etc/fstab
+
+```
+
+**3.2.3. Chạy container, mount từ NFS đã mount**
+
+Trên docker01:
+```bash
+docker run -d --name app1 \
+  -v /mnt/shared:/shared \
+  your-image-a
+
+```
+Trên docker02:
+
+```bash
+docker run -d --name app2 \
+  -v /mnt/shared:/shared \
+  your-image-b
+
+```
+Cả hai app đều dùng chung /shared (thực chất là EFS NFS on‑prem).
+
+---
+### 4. Chọn giải pháp nào?
+
+**EKS + EBS (PV per app)**
+
+  - Khi mỗi app cần volume riêng, không share.
+  - Dùng cho database, stateful service, tool có data riêng.
+    
+**EKS + EFS (shared volume)**
+
+  - Khi nhiều pod trên nhiều node cần share thư mục.
+  - Dùng cho upload chung, log chung, build cache, file share.
+    
+**Docker on‑prem 1 host**
+
+  - Bind mount hoặc docker volume local là đủ.
+    
+**Docker on‑prem nhiều host**
+  - Dùng NFS hoặc distributed FS (GlusterFS/Ceph) → mount vào host → -v vào container.
+
+---
+
