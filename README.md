@@ -123,6 +123,8 @@ Lợi ích:
 
   - Đảm bảo PV (EBS) nằm đúng AZ với node chạy pod.
   - Tránh lỗi pod Pending do “volume node affinity conflict”.
+---
+
 
 ### 1.4. PVC (PersistentVolumeClaim) dùng EBS
 Ví dụ PVC 20Gi cho 1 app:
