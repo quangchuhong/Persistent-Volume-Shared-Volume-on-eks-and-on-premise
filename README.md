@@ -120,3 +120,14 @@ spec:
     - Chỉ 1 AZ,
     - AccessMode ReadWriteOnce (một node tại một thời điểm).
   - Không dùng EBS để share đồng thời giữa nhiều pod trên nhiều node.
+---
+### 2. Shared Volume trên EKS – dùng EFS
+
+2.1. Mục đích
+
+Dùng khi:
+
+  - Nhiều pod / nhiều deployment (có thể trên nhiều node) cần chung 1 thư mục
+  - Ví dụ: thư mục upload chung, log chung, share config, build cache…
+    
+EBS không share giữa nhiều node. Cần dùng EFS (Network FS).
